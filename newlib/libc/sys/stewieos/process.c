@@ -5,6 +5,7 @@
 #include <sys/message.h>
 #include <stdio.h>
 #include <errno.h>
+#include <signal.h>
 
 // Kill the current task/process
 void _exit(int code)
@@ -46,11 +47,16 @@ int getpid()
 	return result;
 }
 
-// **STUB** Send a signal to another process
+// Send a signal to another process
 int kill(int pid, int sig)
 {
-	errno = ESRCH;
-	return -1;
+	int result = 0;
+	SYSCALL2(SYSCALL_KILL, result, pid, sig);
+	if( result < 0 ){
+		errno = -result;
+		return -1;
+	}
+	return 0;
 }
 
 // Wait on a status change of a child
@@ -120,3 +126,38 @@ int message_send(pid_t where, unsigned int type, const char* data, size_t length
 	}
 	return 0;
 }
+
+sighandler_t signal(int sig, sighandler_t handler)
+{
+	int result = 0;
+	SYSCALL2(SYSCALL_SIGNAL, result, sig, handler);
+	if( result < 0 ){
+		errno = -result;
+		return SIG_ERR;
+	}
+
+	return (sighandler_t)result;
+}
+
+void signal_return( void )
+{
+	int result;
+	SYSCALL0(SYSCALL_SIGRET, result);
+}
+
+void signal_init( void )
+{
+	int result;
+	SYSCALL1(SYSCALL_SETSIGRET, result, signal_return);
+}
+
+// int raise(int sig)
+// {
+// 	int result = 0;
+// 	SYSCALL2(SYSCALL_KILL, result, getpid(), sig);
+// 	if( result < 0 ){
+// 		errno = result;
+// 		return 1;
+// 	}
+// 	return 0;
+// }

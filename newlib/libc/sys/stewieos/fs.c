@@ -7,6 +7,29 @@
 #include <stdarg.h>
 #include <errno.h>
 
+
+int dup(int fd)
+{
+	int result;
+	SYSCALL2(SYSCALL_DUP2, result, fd, -1);
+	if( result < 0 ){
+		errno = -result;
+		return -1;
+	}
+	return result;
+}
+
+int dup2(int fd, int otherfd)
+{
+	int result;
+	SYSCALL2(SYSCALL_DUP2, result, fd, otherfd);
+	if( result < 0 ){
+		errno = -result;
+		return -1;
+	}
+	return result;
+}
+
 // Open a file
 int open(const char *name, int flags, ...)
 {
@@ -112,15 +135,13 @@ int link(const char *old, const char *new)
 // **STUB** Get information on an unopened file
 int stat(const char *file, struct stat *st)
 {
-	errno = ENOENT;
-	return -1;
-}
-
-// **STUB** Remove an inode from the file system
-int unlink(const char *name)
-{
-	errno = ENOENT;
-	return -1;
+	int fd = open(file, O_RDONLY);
+	if( fd < 0 ){
+		return -1;
+	}
+	int result = fstat(fd, st);
+	close(fd);
+	return result;
 }
 
 // Change the current working directory 
@@ -175,4 +196,16 @@ int access(const char* pathname, int mode)
 int ioctl(int fd, int request, ...)
 {
 	return -EINVAL;
+}
+
+// Unlink (remove) a file
+int unlink(const char* filename)
+{
+	int result = 0;
+	SYSCALL1(SYSCALL_UNLINK, result, filename);
+	if( result < 0 ){
+		errno = -result;
+		return -1;
+	}
+	return 0;
 }

@@ -479,6 +479,7 @@ case "${host}" in
 
   i[3-7]86-*-stewieos*)
     sys_dir=stewieos
+    newlib_cflags="${newlib_cflags} -DSIGNAL_PROVIDED"
     ;;
 
   m68hc11-*-*|m6811-*-*|m6812-*-*|m68hc12-*-*)

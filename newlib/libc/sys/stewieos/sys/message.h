@@ -20,6 +20,14 @@ enum _pop_flags
 	MESG_POP_WAIT = 0x00000002, // wait until a message is recieved to return
 };
 
+enum _syslog_level
+{
+	SYSLOG_INFO,
+	SYSLOG_WARN,
+	SYSLOG_ERR,
+	SYSLOG_PANIC
+};
+
 typedef struct message
 {
 	pid_t from;
@@ -36,5 +44,7 @@ int message_free(message_t* message);
 int message_pop(message_t* buffer, unsigned int type_mask, unsigned int flags);
 // Send a message to another process
 int message_send(pid_t to, unsigned int type, const char* data, size_t length);
+// Post a message to the system log
+void syslog(int level, const char* message, ...);
 
 #endif /* ifdef _STEWIEOS_MESSAGE_H_ */ 
