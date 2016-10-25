@@ -6,7 +6,13 @@
 #include <sys/syscall.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <sys/mntent.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
+ssize_t getdelim(char** pLine, size_t* pLen, int delim, FILE* stream);
+ssize_t getline(char** pLine, size_t* pLen, FILE* stream);
 
 int dup(int fd)
 {
@@ -208,4 +214,112 @@ int unlink(const char* filename)
 		return -1;
 	}
 	return 0;
+}
+
+// Read a string until the end of the line ('\n')
+ssize_t getline(char** pLine, size_t* pLen, FILE* stream)
+{
+	return getdelim(pLine, pLen, '\n', stream);
+}
+
+// Read a string until the given delimeter or EOF, whichever is first.
+ssize_t getdelim(char** pLine, size_t* pLen, int delim, FILE* stream)
+{
+	// We need this outside the loop
+	size_t idx = 0;
+	int chr = 0;
+
+	// Read characters until EOF or `delim`
+	for( idx = 0; (chr = fgetc(stream)) != EOF; ++idx )
+	{
+		// increase the size of the buffer if needed
+		if( *pLine == NULL || idx >= *pLen ){
+			*pLen += 32; // we increment 32 bytes at a time
+			*pLine = realloc(*pLine, *pLen);
+		}
+		(*pLine)[idx] = chr;
+		if( chr == '\n' ) break;
+	}
+
+	// Add an extra byte if needed for null termination
+	if( (idx+1) == *pLen ){
+		*pLine = realloc(*pLine, *pLen + 1);
+		*pLen += 1;
+	}
+
+	// Add null termination
+	(*pLine)[idx+1] = 0;
+
+	// If we an EOF, return -1
+	if( feof(stream) ){
+		return -1;
+	} else {
+		// Otherwise return the number of characters read
+		return idx+1;
+	}
+}
+
+FILE* setmntent(const char* filename, const char* mode)
+{
+	FILE* stream = fopen(filename, mode);
+	return stream;
+}
+
+struct mntent* getmntent(FILE* stream)
+{
+	static struct mntent mnt;
+	static char* line = NULL;
+	static size_t len = 0;
+
+	/* NOTE: I don't like this. The memory is never free'd.
+			but I don't know of a good way without limiting
+			line length.
+	*/
+	if( getline(&line, &len, stream) == -1 ){
+		return NULL;
+	}
+
+	// Blindly parse... bad idea, but it works...
+	mnt.mnt_fsname = strtok(line, " \t");
+	mnt.mnt_dir = strtok(NULL, " \t");
+	mnt.mnt_type = strtok(NULL, " \t");
+	mnt.mnt_opts = strtok(NULL, " \t");
+	mnt.mnt_freq = 0;
+	mnt.mnt_passno = 0;
+	
+	return &mnt;
+}
+
+int addmntent(FILE* stream, const struct mntent* mnt)
+{
+	if( fprintf(stream, "%s\t%s\t%s\t%s\n", mnt->mnt_fsname, mnt->mnt_dir,
+			mnt->mnt_type, mnt->mnt_opts) <= 0 ){
+		return 1;
+	}
+
+	return 0;
+}
+
+int endmntent(FILE* stream)
+{
+	fclose(stream);
+	return 1;
+}
+
+char* hasmntopt(const struct mntent* mnt, const char* opt)
+{
+
+	char* opts = strdup(mnt->mnt_opts);
+	char* token = strtok(opts, ",");
+	do
+	{
+		if( strcmp(token, opt) == 0 ){
+			free(opts);
+			return (token - opts) + mnt->mnt_opts;
+		}
+	} while( (token = strtok(NULL, ",")) != NULL );
+
+	free(opts);
+
+	return NULL;
 }
